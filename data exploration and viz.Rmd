@@ -1,0 +1,169 @@
+---
+title: "Data Exploration and vizualization"
+output: html_document
+---
+
+Classwork:
+
+# data viz 1  1
+
+```{r}
+library(tidyverse)
+library(ggridges)
+
+weather_df = 
+  rnoaa::meteo_pull_monitors(
+    c("USW00094728", "USC00519397", "USS0023B17S"),
+    var = c("PRCP", "TMIN", "TMAX"), 
+    date_min = "2017-01-01",
+    date_max = "2017-12-31") %>%
+  mutate(
+    name = recode(
+      id, 
+      USW00094728 = "CentralPark_NY", 
+      USC00519397 = "Waikiki_HA",
+      USS0023B17S = "Waterhole_WA"),
+    tmin = tmin / 10,
+    tmax = tmax / 10) %>%
+  select(name, id, everything())
+
+#scatter plot
+
+ggplot(weather_df, aes(x=tmin, y=tmax, color = name)) +
+        geom_point() + 
+        geom_smooth(se = FALSE)
+
+#another way
+
+plot_info = weather_df %>%
+            ggplot(aes(x=tmin, y=tmax))
+
+plot_info + geom_point()
+
+#faceting things
+# . means don't make rows, ~names makes columns
+#alpha in point is transparency
+ggplot(weather_df, aes(x=tmin, y=tmax, color = name)) +
+        geom_point(alpha=.3) + 
+        geom_smooth(se = FALSE) + 
+        facet_grid(.~name)
+weather_df %>%
+  ggplot(aes(x = date, y = tmax, color = name)) +
+  geom_point(aes(size = prcp), alpha = .5) +
+  geom_smooth(se = FALSE) +
+  facet_grid(. ~name)
+  
+#univariate plot
+
+weather_df %>%
+  ggplot(aes(x = tmin, fill = name)) +
+  geom_histogram(alpha=.5)
+#color is weird in histograms, use fill
+
+weather_df %>%
+  ggplot(aes(x = tmin, fill = name)) +
+  geom_histogram() +
+ facet_grid(name ~ .)
+
+weather_df %>%
+  ggplot(aes(x = tmin, fill = name)) +
+  geom_density(alpha = .3)
+
+#trendy plots
+
+weather_plot = weather_df %>%
+  ggplot(aes(x=name, y=tmin, fill=name)) +
+  geom_violin() +
+  stat_summary()
+
+ggsave("weather_plot.pdf", weather_plor, width= 8, height = 5)
+```
+
+# Data wrangling II
+
+
+```{r}
+litters_data = read_csv(file = "./data_import_examples/FAS_litters.csv")
+
+litters_data = janitor::clean_names(litters_data)
+
+options(tibble.print_min = 3)
+skinny_litter = select(litters_data, group:gd_of_birth)
+
+litters_2 = select(litters_data, -pups_survive, GROUP = group)
+
+#select_helpers find columns with specified parts
+litters_different = select(litters_data, litter_number, pups_survive, everything())
+#everything() keeps all but let you rearrange
+
+#relocate and rename can be used instead of select
+
+mutate(litters_data, wt_gain = gd18_weight - gd0_weight, group = str_to_lower(group))
+
+#arrange is a form of sort
+#relocate is for columns, arrange is for sorting rows
+
+head(arrange(litters_data, group, pups_born_alive), 10)
+
+#using piping makes code like a sas datastep
+litters_data = 
+  read_csv("./data_import_examples/FAS_litters.csv", col_types = "ccddiiii") %>%
+  janitor::clean_names() %>%
+  select(-pups_survive) %>%
+  mutate( wt_gain = gd18_weight - gd0_weight, group = str_to_lower(group)) %>% 
+  drop_na(wt_gain)
+```
+# Data Wrangling III
+
+```{R}
+pulse_data = haven::read_sas("./data_import_examples/public_pulse_data.sas7bdat")   %>% janitor::clean_names()
+head(pulse_data)
+
+#wide format to long format
+
+pulse_long = pulse_data %>% pivot_longer(bdi_score_bl:bdi_score_12m , 
+names_to = "visit",
+names_prefix = "bdi_score_",
+values_to = "bdi_score") %>% relocate(id, visit) %>% mutate(visit=recode(visit, "bl" = "00m"))
+
+head(pulse_long)
+```
+Stacking data and binding rows
+
+```{R}
+fellowship_data = 
+  readxl::read_excel("./data_import_examples/LotR_Words.xlsx", range = "B3:D6") %>% mutate(movie= "fellowship_ring")
+
+two_towers_data = 
+  readxl::read_excel("./data_import_examples/LotR_Words.xlsx", range = "F3:H6") %>% mutate(movie= "two_towers")
+
+return_king_data = 
+  readxl::read_excel("./data_import_examples/LotR_Words.xlsx", range = "J3:L6") %>% mutate(movie= "return_king")
+
+lotr_tidy= bind_rows(fellowship_data, two_towers_data, return_king_data) %>%
+  janitor::clean_names() %>% 
+  relocate(movie) %>% 
+  pivot_longer(female:male, names_to = "gender", values_to = "words")
+
+```
+joining datasets
+
+```{R}
+pup_data = 
+  read_csv("./data_import_examples/FAS_pups.csv", col_types = "ciiiii") %>%
+  janitor::clean_names() %>%
+  mutate(sex = recode(sex, `1` = "male", `2` = "female")) 
+
+litter_data = 
+  read_csv("./data_import_examples/FAS_litters.csv", col_types = "ccddiiii") %>%
+  janitor::clean_names() %>%
+  separate(group, into = c("dose", "day_of_tx"), sep = 3) %>%
+  relocate(litter_number) %>%
+  mutate(
+    wt_gain = gd18_weight - gd0_weight,
+    dose = str_to_lower(dose))
+#join litter data on to pups
+
+left_join (pup_data, litter_data, by = "litter_number")
+```
+
