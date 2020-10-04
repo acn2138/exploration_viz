@@ -77,6 +77,10 @@ weather_plot = weather_df %>%
   stat_summary()
 
 ggsave("weather_plot.pdf", weather_plor, width= 8, height = 5)
+
+```
+```{r, fig.width=6, fig.height=3}
+weather_plot
 ```
 
 # Data wrangling II
